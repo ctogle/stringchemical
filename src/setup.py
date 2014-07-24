@@ -47,7 +47,7 @@ This is the stringchemical package of modular
 	packages = ['chemical', 'chemical.scripts'], 
 	py_modules = core_modules, 
 	dependency_links = [
-		'https://github.com/ctogle/modular/tree/nomodules'
+		'https://github.com/ctogle/modular/tree/nomodules.git'
 					], 
 	zip_safe = False,
 	#ext_package = 'modular_core.modules.chemicallite_support',

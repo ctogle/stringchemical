@@ -1,10 +1,30 @@
+import unittest
 
+import modular_core.libfundamental as lfu
+lfu.USING_GUI = False
 import stringchemical as sc
 
-if hasattr(sc, 'simulate'):
-	print 'stringchemical module imported'
+import os, sys, pdb
 
-import chemical.scripts.chemicallite as lcl
+#log = open(os.path.join(os.getcwd(), 'test_ensemble.log'), 'w')
+#sys.stdout = log
 
-if hasattr(lcl, 'module_name'):
-	print 'chemicallite module imported as', lcl.module_name
+class dummyTestCase(unittest.TestCase):
+	"""Tests for `stringchemical module`."""
+	#simple_mcfg = os.path.join(os.getcwd(), 
+	#			'stringchemical_dep_mcfgs', 
+	#			'MM_kinetics_boring.mcfg')
+
+	def pause(self, *args, **kwargs):
+		sys.stdout = sys.__stdout__
+		pdb.set_trace()
+		sys.stdout = log
+
+	def test_can_make_ensemble(self):
+		self.assertFalse(sc.simulate() == None)
+		self.assertTrue(lfu.is_module_valid('chemical'))
+
+if __name__ == '__main__':
+    unittest.main()
+
+
