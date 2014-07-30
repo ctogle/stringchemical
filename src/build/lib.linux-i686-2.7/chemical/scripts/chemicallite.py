@@ -356,13 +356,6 @@ class variable(modular_object):
 		self.ensem = None
 		return '\t' + self.label + ' : ' + str(self.value)
 
-	def set_pspace_settables(self, *args, **kwargs):
-		self.parameter_space_templates =\
-			[lgeo.interface_template_p_space_axis(parent = self, 
-							p_sp_bounds = self._p_sp_bounds_[0], 
-								instance = self, key = 'value')]
-		lfu.modular_object_qt.set_pspace_settables(self, *args, **kwargs)
-
 	def set_settables(self, *args, **kwargs):
 		ensem = args[1]
 		self.parent = ensem
@@ -380,8 +373,12 @@ class variable(modular_object):
 		#dictionary_support = lgm.dictionary_support_mason(window)
 		where_reference = ensem.run_params['variables']
 		cartographer_support = lgm.cartographer_mason(window)
-		self.set_pspace_settables(*args, **kwargs)
 		self.handle_widget_inheritance(*args, **kwargs)
+		self.parameter_space_templates =\
+			[lgeo.interface_template_p_space_axis(parent = self, 
+							p_sp_bounds = self._p_sp_bounds_[0], 
+								instance = self, key = 'value')]
+		self.parameter_space_templates[0].set_settables(*args, **kwargs)
 		self.widg_templates.append(
 			lgm.interface_template_gui(
 				widgets = ['spin'], 
@@ -579,7 +576,6 @@ class reaction(modular_object):
 		spec_list = ensem.run_params['species'].keys()
 		cartographer_support = lgm.cartographer_mason(window)
 		self.handle_widget_inheritance(*args, **kwargs)
-		self.set_pspace_settables(*args, **kwargs)
 		#self.parameter_space_templates =\
 		#	[lgeo.interface_template_p_space_axis(parent = self, 
 		#					p_sp_bounds = self._p_sp_bounds_[0], 
@@ -642,22 +638,12 @@ class species(modular_object):
 		self.ensem = None
 		return '\t' + self.label + ' : ' + str(self.initial_count)
 
-	def set_pspace_settables(self, *args, **kwargs):
-		self.parameter_space_templates =\
-			[lgeo.interface_template_p_space_axis(instance = self, 
-							key = 'initial_count', parent = self, 
-							p_sp_bounds = self._p_sp_bounds_[0], 
-							p_sp_increment = self._p_sp_increments_[0], 
-											p_sp_continuous = False)]
-		lfu.modular_object_qt.set_pspace_settables(self, *args, **kwargs)
-
 	def set_settables(self, *args, **kwargs):
 		window = args[0]
 		self.parent = args[1]
 		ensem = self.parent
 		cartographer_support = lgm.cartographer_mason(window)
 		self.handle_widget_inheritance(*args, **kwargs)
-		self.set_pspace_settables(*args, **kwargs)
 		if self.brand_new:
 			ensem.run_params['plot_targets'].append(self.label)
 			plan = ensem.run_params['output_plans']['Simulation']
@@ -702,6 +688,13 @@ class species(modular_object):
 					for rxn in ensem.run_params['reactions']])		
 		window = args[1]
 		self.handle_widget_inheritance(*args, **kwargs)
+		self.parameter_space_templates =\
+			[lgeo.interface_template_p_space_axis(instance = self, 
+							key = 'initial_count', parent = self, 
+							p_sp_bounds = self._p_sp_bounds_[0], 
+							p_sp_increment = self._p_sp_increments_[0], 
+											p_sp_continuous = False)]
+		self.parameter_space_templates[0].set_settables(*args, **kwargs)
 		self.widg_templates.append(
 			lgm.interface_template_gui(
 				mason = cartographer_support, 
