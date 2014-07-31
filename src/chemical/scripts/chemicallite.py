@@ -380,8 +380,8 @@ class variable(modular_object):
 		#dictionary_support = lgm.dictionary_support_mason(window)
 		where_reference = ensem.run_params['variables']
 		cartographer_support = lgm.cartographer_mason(window)
-		self.set_pspace_settables(*args, **kwargs)
 		self.handle_widget_inheritance(*args, **kwargs)
+		self.set_pspace_settables(*args, **kwargs)
 		self.widg_templates.append(
 			lgm.interface_template_gui(
 				widgets = ['spin'], 
@@ -701,7 +701,7 @@ class species(modular_object):
 					'append_tuples_list', 0, 0)]) 
 					for rxn in ensem.run_params['reactions']])		
 		window = args[1]
-		self.handle_widget_inheritance(*args, **kwargs)
+		#self.handle_widget_inheritance(*args, **kwargs)
 		self.widg_templates.append(
 			lgm.interface_template_gui(
 				mason = cartographer_support, 
