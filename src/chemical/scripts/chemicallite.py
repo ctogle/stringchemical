@@ -5,7 +5,7 @@ import modular_core.libmath as lm
 import modular_core.libgeometry as lgeo
 import modular_core.libfitroutine as lfr
 import modular_core.libpostprocess as lpp
-#import libs.modular_core.libcriterion as lc
+import modular_core.libcriterion as lc
 import modular_core.libmodcomponents as lmc
 
 import stringchemical as chemfast
@@ -14,9 +14,11 @@ import stringchemical_timeout as chemfast_timeout
 import sys, time, types, random, traceback
 import numpy as np
 from math import log as log
+import cStringIO as sio
 
 import pdb
 
+#_system_string_ = ''
 if __name__ == 'chemical.scripts.chemicallite':
 	if lfu.gui_pack is None: lfu.find_gui_pack()
 	lgm = lfu.gui_pack.lgm
@@ -29,6 +31,89 @@ if __name__ == '__main__':
 module_name = 'chemical'
 run_param_keys = lmc.run_param_keys +\
 	['Variables', 'Functions', 'Reactions', 'Species']
+
+# this is a handle to set param specific info per p-space location
+def run_params_to_location(ensem):
+    global _system_string_
+
+    def make_rxn_string(rxn):
+	used = '+'.join([''.join(['(', str(agent[1]), ')', 
+			agent[0]]) for agent in rxn.used])
+	prod = '+'.join([''.join(['(', str(agent[1]), ')', 
+                    agent[0]]) for agent in rxn.produced])
+    	return '->'.join([used, str(rxn.rate), prod])
+
+    def int_fix(cnt):
+	if float(cnt) < 1: return 0
+	else: return cnt
+
+    params = ensem.run_params.partition['system']
+
+    sub_spec = [':'.join([spec.label, str(int_fix(spec.initial_count))]) 
+	                    for spec in params['species'].values()]
+    spec_string = '<species>' + ','.join(sub_spec)
+
+    sub_var = [':'.join([key, str(var.value)]) for key, var in 
+                            params['variables'].items()]
+    variable_string = '<variables>' + ','.join(sub_var)
+
+    def check_ext(afunc):
+        extcnt = afunc.count('external_signal')
+        fixed = []
+        for exts in range(extcnt):
+            leads = afunc.find('external_signal(')
+            subfunc = afunc[leads+16:]
+            presig = afunc[:leads+16]
+            postsig = subfunc[subfunc.find('&'):]
+            filename = subfunc[:subfunc.find(postsig)]
+
+            #filename = subfunc[:subfunc.find('&')]
+            with open(filename,'r') as handle:
+                extlines = handle.readlines()
+
+            extstrx = sio.StringIO()
+            extstry = sio.StringIO()
+            for eline in extlines:
+                elx,ely = eline.strip().split(',')
+                extstrx.write(str(elx))
+                extstrx.write('$')
+                extstry.write(str(ely))
+                extstry.write('$')
+
+            fixhash = '%#%'
+            extstrx.write('@')
+            fixval = extstrx.getvalue() + extstry.getvalue()
+            fixed.append((fixhash,fixval))
+            afunc = presig + fixhash + postsig
+        
+        for fix in fixed: afunc = afunc.replace(fix[0],fix[1])
+        #for fix in fixed: afunc = afunc.replace(fix[0],'---')
+        return afunc
+    
+    sub_func = ['='.join([key, fu.func_statement.replace(',', '&')]) 
+		    for key, fu in params['functions'].items()]
+    sub_func = [check_ext(sf) for sf in sub_func]
+    function_string = '<functions>' + ','.join(sub_func)
+
+    sub_rxn = ','.join([make_rxn_string(rxn) 
+        for rxn in params['reactions']])
+    reaction_string = '<reactions>' + sub_rxn
+
+    sub_end = lc.read_criteria(params['end_criteria'], '')
+    end_string = '<end>' + sub_end
+
+    sub_capt = lc.read_criteria(params['capture_criteria'], '')
+    capture_string = '<capture>' + sub_capt
+
+    targs = params['plot_targets']
+    sub_targ = ','.join(targs[3:] + targs[:3])
+    target_string = '<targets>' + sub_targ + '||'
+
+    system_string = spec_string + variable_string +\
+	function_string + reaction_string + end_string +\
+			capture_string + target_string
+
+    _system_string_ = system_string
 
 def generate_gui_templates_qt(window, ensemble):
 	set_module_memory_(ensemble)
@@ -269,43 +354,8 @@ def write_mcfg(*args):
 class sim_system(lsc.sim_system_external):
 
 	def encode(self):
-
-		def make_rxn_string(rxn):
-			used = '+'.join([''.join(['(', str(agent[1]), ')', 
-							agent[0]]) for agent in rxn.used])
-			prod = '+'.join([''.join(['(', str(agent[1]), ')', 
-						agent[0]]) for agent in rxn.produced])
-			return '->'.join([used, str(rxn.rate), prod])
-
-		def int_fix(cnt):
-			if float(cnt) < 1: return 0
-			else: return cnt
-
-		sub_spec = [':'.join([spec.label, 
-			str(int_fix(spec.initial_count))]) 
-			for spec in self.params['species'].values()]
-		spec_string = '<species>' + ','.join(sub_spec)
-		sub_var = [':'.join([key, str(var.value)]) for key, var in 
-								self.params['variables'].items()]
-		variable_string = '<variables>' + ','.join(sub_var)
-		sub_func = ['='.join([key, fu.func_statement.replace(',', '&')]) 
-					for key, fu in self.params['functions'].items()]
-		function_string = '<functions>' + ','.join(sub_func)
-		sub_rxn = ','.join([make_rxn_string(rxn) for rxn in 
-								self.params['reactions']])
-		reaction_string = '<reactions>' + sub_rxn
-		sub_end = self.read_criteria(
-			self.params['end_criteria'], '')
-		end_string = '<end>' + sub_end
-		sub_capt = self.read_criteria(
-			self.params['capture_criteria'], '')
-		capture_string = '<capture>' + sub_capt
-		targs = self.params['plot_targets']
-		sub_targ = ','.join(targs[3:] + targs[:3])
-		target_string = '<targets>' + sub_targ + '||'
-		self.system_string = spec_string + variable_string +\
-			function_string + reaction_string + end_string +\
-			capture_string + target_string
+                global _system_string_
+                self.system_string = _system_string_
 
 	def iterate(self):
 		try:

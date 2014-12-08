@@ -43,7 +43,7 @@ setup(
 """\
 This is the stringchemical package of modular
 """,
-	install_requires = requirements, 
+	#install_requires = requirements, 
 	packages = ['chemical', 'chemical.scripts'], 
 	py_modules = core_modules, 
 	dependency_links = [
