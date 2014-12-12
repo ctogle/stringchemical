@@ -18,7 +18,7 @@ import cStringIO as sio
 
 import pdb
 
-#_system_string_ = ''
+_system_string_ = '__initialized_system_string__'
 if __name__ == 'chemical.scripts.chemicallite':
 	if lfu.gui_pack is None: lfu.find_gui_pack()
 	lgm = lfu.gui_pack.lgm
@@ -74,7 +74,9 @@ def run_params_to_location(ensem):
             extstrx = sio.StringIO()
             extstry = sio.StringIO()
             for eline in extlines:
-                elx,ely = eline.strip().split(',')
+                eline = eline.strip()
+                if not eline.count(',') > 0: continue
+                elx,ely = eline.split(',')
                 extstrx.write(str(elx))
                 extstrx.write('$')
                 extstry.write(str(ely))
@@ -112,7 +114,6 @@ def run_params_to_location(ensem):
     system_string = spec_string + variable_string +\
 	function_string + reaction_string + end_string +\
 			capture_string + target_string
-
     _system_string_ = system_string
 
 def generate_gui_templates_qt(window, ensemble):
@@ -356,6 +357,48 @@ class sim_system(lsc.sim_system_external):
 	def encode(self):
                 global _system_string_
                 self.system_string = _system_string_
+
+                return
+                # this can simply grab the global info thats set at a p-space
+                # location specific time
+                '''#
+		def make_rxn_string(rxn):
+			used = '+'.join([''.join(['(', str(agent[1]), ')', 
+							agent[0]]) for agent in rxn.used])
+			prod = '+'.join([''.join(['(', str(agent[1]), ')', 
+						agent[0]]) for agent in rxn.produced])
+			return '->'.join([used, str(rxn.rate), prod])
+
+		def int_fix(cnt):
+			if float(cnt) < 1: return 0
+			else: return cnt
+
+		sub_spec = [':'.join([spec.label, 
+			str(int_fix(spec.initial_count))]) 
+			for spec in self.params['species'].values()]
+		spec_string = '<species>' + ','.join(sub_spec)
+		sub_var = [':'.join([key, str(var.value)]) for key, var in 
+								self.params['variables'].items()]
+		variable_string = '<variables>' + ','.join(sub_var)
+		sub_func = ['='.join([key, fu.func_statement.replace(',', '&')]) 
+					for key, fu in self.params['functions'].items()]
+		function_string = '<functions>' + ','.join(sub_func)
+		sub_rxn = ','.join([make_rxn_string(rxn) for rxn in 
+								self.params['reactions']])
+		reaction_string = '<reactions>' + sub_rxn
+		sub_end = self.read_criteria(
+			self.params['end_criteria'], '')
+		end_string = '<end>' + sub_end
+		sub_capt = self.read_criteria(
+			self.params['capture_criteria'], '')
+		capture_string = '<capture>' + sub_capt
+		targs = self.params['plot_targets']
+		sub_targ = ','.join(targs[3:] + targs[:3])
+		target_string = '<targets>' + sub_targ + '||'
+		self.system_string = spec_string + variable_string +\
+			function_string + reaction_string + end_string +\
+			capture_string + target_string
+                '''#
 
 	def iterate(self):
 		try:
