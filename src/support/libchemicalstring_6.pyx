@@ -14,6 +14,9 @@ import random
 import numpy as np
 import re
 
+from random import random as uniform_rand
+
+from numpy import cumprod as cumulative_product
 from numpy import pi
 
 #System State Variables
@@ -59,24 +62,66 @@ class external_signal(object):
         self.xs = [float(v) for v in xdatastr]
         self.ys = [float(v) for v in ydatastr]
         self.pcnt = len(self.xs)
+        self.last_found_index = 0
+
+        self.slopes = [self.slope(dx-1,dx) for dx in range(1,self.pcnt)]
+    
+    def slope(self,t0,t1):
+        xs,ys = self.xs,self.ys
+        x0,x1 = xs[t0],xs[t1]
+        y0,y1 = ys[t0],ys[t1]
+        if x0 == x1:return None
+        m = (y1-y0)/(x1-x0)
+        return m
 
     def __call__(self,x):
         return self.sample(x)
+        #return self.sample_bottom(x)
 
+    def sample_bottom(self,x):
+        xs,ys = self.xs,self.ys
+        t0 = self.find_dexes(xs,x)
+        x0 = xs[t0]
+        y0 = ys[t0]
+        return y0
+    
     def sample(self,x):
         xs,ys = self.xs,self.ys
         if x == xs[-1]: return ys[-1]
-        t0,t1 = self.find_dexes(xs,x)
-        x0,x1 = xs[t0],xs[t1]
-        y0,y1 = ys[t0],ys[t1]
-        if x0 == x1: return None
-        m = (y1-y0)/(x1-x0)
+        t0 = self.find_dexes(xs,x)
+        x0 = xs[t0]
+        y0 = ys[t0]
+        m = self.slopes[t0]
         v = y0 + m*(x-x0)
         return v
 
+    '''#
+    def sample(self,x):
+        xs,ys = self.xs,self.ys
+        if x == xs[-1]: return ys[-1]
+        t0 = self.find_dexes(xs,x)
+        #t0,t1 = self.find_dexes(xs,x)
+        #x0,x1 = xs[t0],xs[t1]
+        x0 = xs[t0]
+        #y0,y1 = ys[t0],ys[t1]
+        y0 = ys[t0]
+        #if x0 == x1:return None
+        #m = (y1-y0)/(x1-x0)
+        m = self.slopes[t0]
+        v = y0 + m*(x-x0)
+        return v
+    '''#
+
     def find_dexes(self,xs,t):
-        for dx in range(self.pcnt):
-            if xs[dx] > t: return dx - 1, dx
+        last = self.last_found_index
+        for dx in range(last,self.pcnt):
+            if xs[dx] >= t:
+                self.last_found_index = dx - 1
+                return dx - 1
+                #return dx - 1, dx
+
+        print 'cannot extrapolate!!!'
+        raise ValueError
 
 #TODO consider using __call__ instead of calculate
 cdef class Rate:
@@ -962,6 +1007,8 @@ def generate_functions(count_targets, functions_string):
 
     # list of functions as strings
     function_strs = functions_string.split(',')
+
+    #for fstr in function_strs: print fstr
 
     ##########
     ##########
