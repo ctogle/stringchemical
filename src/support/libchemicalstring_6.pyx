@@ -64,7 +64,7 @@ class external_signal(object):
         self.pcnt = len(self.xs)
         self.last_found_index = 0
 
-        self.slopes = [self.slope(dx-1,dx) for dx in range(1,self.pcnt)]
+        #self.slopes = [self.slope(dx-1,dx) for dx in range(1,self.pcnt)]
     
     def slope(self,t0,t1):
         xs,ys = self.xs,self.ys
@@ -75,8 +75,8 @@ class external_signal(object):
         return m
 
     def __call__(self,x):
-        return self.sample(x)
-        #return self.sample_bottom(x)
+        #return self.sample(x)
+        return self.sample_bottom(x)
 
     def sample_bottom(self,x):
         xs,ys = self.xs,self.ys
