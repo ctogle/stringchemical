@@ -1,12 +1,15 @@
 import modular_core.libfundamental as lfu
-from modular_core.libfundamental import modular_object_qt as modular_object
+from modular_core.libfundamental import mobject as modular_object
+
+#from modular_core.libfundamental import modular_object_qt as modular_object
 import modular_core.libsimcomponents as lsc
 import modular_core.libmath as lm
 import modular_core.libgeometry as lgeo
-import modular_core.libfitroutine as lfr
-import modular_core.libpostprocess as lpp
-import modular_core.libcriterion as lc
 import modular_core.libmodcomponents as lmc
+
+import modular_core.fitting.libfitroutine as lfr
+import modular_core.postprocessing.libpostprocess as lpp
+import modular_core.criteria.libcriterion as lc
 
 import stringchemical as chemfast
 import stringchemical_timeout as chemfast_timeout
@@ -29,7 +32,7 @@ if __name__ == '__main__':
 	print 'this is the chemical lite module library!'
 
 module_name = 'chemical'
-run_param_keys = lmc.run_param_keys +\
+run_param_keys = lmc.simulation_module.run_parameter_keys +\
 	['Variables', 'Functions', 'Reactions', 'Species']
 
 # this is a handle to set param specific info per p-space location
@@ -473,7 +476,7 @@ class variable(modular_object):
 		#dictionary_support = lgm.dictionary_support_mason(window)
 		where_reference = ensem.run_params['variables']
 		cartographer_support = lgm.cartographer_mason(window)
-		self.handle_widget_inheritance(*args, **kwargs)
+		self._sanitize(*args,**kwargs)
 		self.set_pspace_settables(*args, **kwargs)
 		self.widg_templates.append(
 			lgm.interface_template_gui(
