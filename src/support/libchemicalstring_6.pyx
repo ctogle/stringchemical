@@ -1098,14 +1098,6 @@ system_string_samp = '<species>Substrate:10000,Enzyme:5000,ES_Complex:0,Product:
 #@cython.cdivision(True)
 def simulate(system_string = system_string_samp, seed = None):
 
-
-
-    
-    #external_funcion()
-
-
-
-
     # set random number generator seed
     if (not seed == None):
         random.seed(seed)

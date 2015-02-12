@@ -12,14 +12,12 @@ import modular_core.postprocessing.libpostprocess as lpp
 import modular_core.criteria.libcriterion as lc
 
 import stringchemical as chemfast
-import stringchemical_timeout as chemfast_timeout
+import stringchemical_timeout as chemfast_to
 
-import sys, time, types, random, traceback
+import pdb,sys,time,types,random,traceback
 import numpy as np
 from math import log as log
-import cStringIO as sio
-
-import pdb
+from cStringIO import StringIO
 
 if __name__ == 'chemical.scripts.chemicallite':
     lfu.check_gui_pack()
@@ -29,7 +27,6 @@ if __name__ == 'chemical.scripts.chemicallite':
 if __name__ == '__main__':print 'stringchemical module'
 
 module_name = 'chemical'
-_system_string_ = '__initialized_system_string__'
 
 class simulation_module(lmc.simulation_module):
 
@@ -91,10 +88,11 @@ class simulation_module(lmc.simulation_module):
     def _parse_species(self,li,ensem,parser,procs,routs,targs):
         spl = lfu.msplit(li)
         spec,value = spl
-        new = species(name = spec,initial_count = value)
+        new = species(name = spec,initial = value)
         return spec, new
 
     def __init__(self,*args,**kwargs):
+        self._default('timeout',0.0,**kwargs)
         self.run_parameter_keys.extend(
             ['Variables','Functions','Reactions','Species'])
         self.parse_types.extend(
@@ -106,105 +104,67 @@ class simulation_module(lmc.simulation_module):
 
     def _write_mcfg(self,mcfg_path,ensem):
         rparams = ensem.run_params
-        mcfg = sio.StringIO()
+        mcfg = StringIO()
         self._write_mcfg_run_param_key(rparams,'variables',mcfg)
         self._write_mcfg_run_param_key(rparams,'functions',mcfg)
         self._write_mcfg_run_param_key(rparams,'reactions',mcfg)
         self._write_mcfg_run_param_key(rparams,'species',mcfg)
         lmc.simulation_module._write_mcfg(mcfg_path,ensem,mcfg)
 
+    # encode the species for cython simulation
+    def _set_parameters_species(self,sysstr):
+        species = self.parent.run_params['species']
+        sub_spec = [species[s]._sim_string() for s in species]
+        sysstr.write('<species>')
+        sysstr.write(','.join(sub_spec))
 
+    # encode the variables for cython simulation
+    def _set_parameters_variables(self,sysstr):
+        varis = self.parent.run_params['variables']
+        sub_var = [varis[v]._sim_string() for v in varis]
+        sysstr.write('<variables>')
+        sysstr.write(','.join(sub_var))
 
-    # NEEDS SERIOUS REFACTORING
-    # NEEDS SERIOUS REFACTORING
-    # NEEDS SERIOUS REFACTORING
+    # encode the functions for cython simulation
+    def _set_parameters_functions(self,sysstr):
+        funcs = self.parent.run_params['functions']
+        sub_fun = [funcs[f]._sim_string() for f in funcs]
+        sysstr.write('<functions>')
+        sysstr.write(','.join(sub_fun))
+
+    # encode the reactions for cython simulation
+    def _set_parameters_reactions(self,sysstr):
+        rxns = self.parent.run_params['reactions']
+        sub_rxs = [r._sim_string() for r in rxns]
+        sysstr.write('<reactions>')
+        sysstr.write(','.join(sub_rxs))
+
+    # encode criteria for cython simulation
+    def _set_parameters_criteria(self,sysstr,kind):
+        crits = self.parent.run_params[kind+'_criteria']
+        sub_crits = [c._sim_string() for c in crits]
+        sysstr.write('<'+kind+'>')
+        sysstr.write(','.join(sub_crits))
+
+    # encode plot_targets for cython simulation
+    def _set_parameters_plot_targets(self,sysstr):
+        targs = self.parent.run_params['plot_targets']
+        targs = targs[2:] + targs[:2]
+        sysstr.write('<targets>')
+        sysstr.write(','.join(targs))
+        sysstr.write('||')
+
     # this is a handle to set param specific info per p-space location
     def _set_parameters(self):
-        global _system_string_
-
-        def make_rxn_string(rxn):
-          used = '+'.join([''.join(['(', str(agent[1]), ')', 
-              agent[0]]) for agent in rxn.used])
-          prod = '+'.join([''.join(['(', str(agent[1]), ')', 
-                            agent[0]]) for agent in rxn.produced])
-          return '->'.join([used, str(rxn.rate), prod])
-
-        def int_fix(cnt):
-          if float(cnt) < 1: return 0
-          else: return cnt
-
-        params = ensem.run_params.partition['system']
-
-        sub_spec = [':'.join([spec.label, str(int_fix(spec.initial_count))]) 
-                          for spec in params['species'].values()]
-        spec_string = '<species>' + ','.join(sub_spec)
-
-        sub_var = [':'.join([key, str(var.value)]) for key, var in 
-                                params['variables'].items()]
-        variable_string = '<variables>' + ','.join(sub_var)
-
-        def check_ext(afunc):
-            extcnt = afunc.count('external_signal')
-            fixed = []
-            for exts in range(extcnt):
-                leads = afunc.find('external_signal(')
-                subfunc = afunc[leads+16:]
-                presig = afunc[:leads+16]
-                postsig = subfunc[subfunc.find('&'):]
-                filename = subfunc[:subfunc.find(postsig)]
-
-                #filename = subfunc[:subfunc.find('&')]
-                with open(filename,'r') as handle:
-                    extlines = handle.readlines()
-
-                extstrx = sio.StringIO()
-                extstry = sio.StringIO()
-                for eline in extlines:
-                    eline = eline.strip()
-                    if not eline.count(',') > 0: continue
-                    elx,ely = eline.split(',')
-                    extstrx.write(str(elx))
-                    extstrx.write('$')
-                    extstry.write(str(ely))
-                    extstry.write('$')
-
-                fixhash = '%#%'
-                extstrx.write('@')
-                fixval = extstrx.getvalue() + extstry.getvalue()
-                fixed.append((fixhash,fixval))
-                afunc = presig + fixhash + postsig
-            
-            for fix in fixed: afunc = afunc.replace(fix[0],fix[1])
-            #for fix in fixed: afunc = afunc.replace(fix[0],'---')
-            return afunc
-        
-        sub_func = ['='.join([key, fu.func_statement.replace(',', '&')]) 
-            for key, fu in params['functions'].items()]
-        sub_func = [check_ext(sf) for sf in sub_func]
-        function_string = '<functions>' + ','.join(sub_func)
-
-        sub_rxn = ','.join([make_rxn_string(rxn) 
-            for rxn in params['reactions']])
-        reaction_string = '<reactions>' + sub_rxn
-
-        sub_end = lc.read_criteria(params['end_criteria'], '')
-        end_string = '<end>' + sub_end
-
-        sub_capt = lc.read_criteria(params['capture_criteria'], '')
-        capture_string = '<capture>' + sub_capt
-
-        targs = params['plot_targets']
-        sub_targ = ','.join(targs[3:] + targs[:3])
-        target_string = '<targets>' + sub_targ + '||'
-
-        system_string = spec_string + variable_string +\
-            function_string + reaction_string + end_string +\
-                capture_string + target_string
-
-        _system_string_ = system_string
-        
-
-
+        sysstr = StringIO()
+        self._set_parameters_species(sysstr)
+        self._set_parameters_variables(sysstr)
+        self._set_parameters_functions(sysstr)
+        self._set_parameters_reactions(sysstr)
+        self._set_parameters_criteria(sysstr,'end')
+        self._set_parameters_criteria(sysstr,'capture')
+        self._set_parameters_plot_targets(sysstr)
+        self.system_string = sysstr.getvalue()
 
     def _reset_parameters(self):
         ensem = self.parent
@@ -258,6 +218,19 @@ class simulation_module(lmc.simulation_module):
             'Species','species','species_selector','selected_species'))
         return panel_template_lookup
 
+    def _finalize_data(self,data,targets,ignore = []):
+        reorder = []
+        for name in self.parent.run_params['plot_targets']:
+            if name in ignore or name not in targets: continue
+            reorder.append(data[targets.index(name)])
+        return np.array(reorder,dtype = np.float)
+
+    def _simulate(self,*args,**kwargs):
+        sstr = self.system_string
+        if self.timeout:data = chemfast_to.simulate(sstr,self.timeout)
+        else:data = chemfast.simulate(sstr)
+        return self._finalize_data(*data)
+
 ################################################################################
 ### run_parameter subclasses used to interface with the cython simulator
 ###   species
@@ -270,15 +243,18 @@ class species(run_param):
 
     def __init__(self,*args,**kwargs):
         self._default('name','aspecies',**kwargs)
-        self._default('initial_count',0,**kwargs)
+        self._default('initial',0,**kwargs)
         pspace_axes =\
-          [lgeo.pspace_axis(instance = self,key = 'initial_count',
+          [lgeo.pspace_axis(instance = self,key = 'initial',
               bounds = [0,1000000],increment = 1,continuous = False)]
         self.pspace_axes = pspace_axes
         run_param.__init__(self,*args,**kwargs)
 
+    def _sim_string(self):
+        return self.name + ':' + str(lfu.clamp(int(self.initial),0,sys.maxint))
+
     def _string(self):
-        return '\t' + self.name + ' : ' + str(self.initial_count)
+        return '\t' + self.name + ' : ' + str(self.initial)
 
     def _widget(self,*args,**kwargs):
         window = args[0]
@@ -290,10 +266,10 @@ class species(run_param):
                 mason = cartographer_support, 
                 widgets = ['spin'], 
                 instances = [[self]], 
-                keys = [['initial_count']], 
+                keys = [['initial']], 
                 minimum_values = [[0]], 
                 maximum_values = [[sys.maxint]], 
-                initials = [[self.initial_count]], 
+                initials = [[self.initial]], 
                 box_labels = ['Initial Count'], 
                 parameter_space_templates =\
                     [self.pspace_axes[0]]))
@@ -322,6 +298,11 @@ class reaction(run_param):
                 continuous = True)]
         self.pspace_axes = pspace_axes
         run_param.__init__(self,*args,**kwargs)
+
+    def _sim_string(self):
+        def spec(agent):return '(' + str(agent[1]) + ')' + agent[0]
+        def side(agents):return '+'.join([spec(a) for a in agents])
+        return side(self.used)+'->'+str(self.rate)+'->'+side(self.produced)
 
     def _string(self):
         def _string_agents(agents):
@@ -380,6 +361,9 @@ class variable(run_param):
         self.pspace_axes = pspace_axes
         run_param.__init__(self,*args,**kwargs)
 
+    def _sim_string(self):
+        return self.name + ':' + str(self.value)
+
     def _string(self):
         return '\t' + self.name + ' : ' + str(self.value)
 
@@ -417,6 +401,42 @@ class function(run_param):
         self._default('func_statement','',**kwargs)
         run_param.__init__(self,*args,**kwargs)
 
+    # modifies sim_string for ext_signal support
+    #   THIS NEEDS MORE CLEANUP
+    def _sim_string_ext_signal(self):
+        afunc = self.func_statement
+        extcnt = afunc.count('external_signal')
+        fixed = []
+        for exts in range(extcnt):
+            leads = afunc.find('external_signal(')
+            subfunc = afunc[leads+16:]
+            presig = afunc[:leads+16]
+            postsig = subfunc[subfunc.find('&'):]
+            filename = subfunc[:subfunc.find(postsig)]
+            with open(filename,'r') as handle:
+                extlines = [l.strip() for l in handle.readlines()]
+
+            extstrx = StringIO()
+            extstry = StringIO()
+            for eline in extlines:
+                eline = eline.strip()
+                if not eline.count(',') > 0: continue
+                elx,ely = eline.split(',')
+                extstrx.write(str(elx));extstrx.write('$')
+                extstry.write(str(ely));extstry.write('$')
+
+            fixhash = '%#%'
+            extstrx.write('@')
+            fixval = extstrx.getvalue() + extstry.getvalue()
+            fixed.append((fixhash,fixval))
+            afunc = presig + fixhash + postsig
+            for fix in fixed: afunc = afunc.replace(fix[0],fix[1])
+        return afunc
+
+    def _sim_string(self):
+        sysstr = self.name + '=' + self.func_statement.replaces(',','&')
+        return self._sim_string_ext_signal(sysstr)
+
     def _string(self):
         return '\t' + self.name + ' : ' + self.func_statement
 
@@ -441,42 +461,6 @@ class function(run_param):
 
 ################################################################################
 ################################################################################
-
-
-
-
-
-class sim_system(lsc.sim_system_external):
-
-  def encode(self):
-      global _system_string_
-      self.system_string = _system_string_
-      return
-
-  def iterate(self):
-    try:
-      #seed = int(time.time()) + self.identifier
-      if self.timeout:
-        self.data = self.finalize_data(
-          *chemfast_timeout.simulate(
-            self.system_string, self.timeout))
-            #self.system_string, seed, self.timeout))
-
-      else:
-        self.data = self.finalize_data(
-          *chemfast.simulate(self.system_string))
-          #*chemfast.simulate(self.system_string, seed))
-
-    except ValueError:
-      traceback.print_exc(file=sys.stdout)
-      print 'simulation failed; aborting'
-      self.bAbort = True
-      raise ValueError
-    except:
-      traceback.print_exc(file=sys.stdout)
-      print 'simulation failed; aborting'
-      self.bAbort = True
-
 
 
 
