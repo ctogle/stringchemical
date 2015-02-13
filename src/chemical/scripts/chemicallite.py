@@ -92,7 +92,6 @@ class simulation_module(lmc.simulation_module):
         return spec, new
 
     def __init__(self,*args,**kwargs):
-        self._default('timeout',0.0,**kwargs)
         self.run_parameter_keys.extend(
             ['Variables','Functions','Reactions','Species'])
         self.parse_types.extend(
@@ -100,6 +99,7 @@ class simulation_module(lmc.simulation_module):
         self.parse_funcs.extend(
             [self._parse_variable,self._parse_function, 
             self._parse_reaction,self._parse_species])
+        self.simulation = simulate
         lmc.simulation_module.__init__(self,*args,**kwargs)
 
     def _write_mcfg(self,mcfg_path,ensem):
@@ -165,6 +165,8 @@ class simulation_module(lmc.simulation_module):
         self._set_parameters_criteria(sysstr,'capture')
         self._set_parameters_plot_targets(sysstr)
         self.system_string = sysstr.getvalue()
+        ptargs = self.parent.run_params['plot_targets'][:]
+        self.sim_args = (self.system_string,self.timeout,ptargs)
 
     def _reset_parameters(self):
         ensem = self.parent
@@ -218,18 +220,20 @@ class simulation_module(lmc.simulation_module):
             'Species','species','species_selector','selected_species'))
         return panel_template_lookup
 
-    def _finalize_data(self,data,targets,ignore = []):
-        reorder = []
-        for name in self.parent.run_params['plot_targets']:
-            if name in ignore or name not in targets: continue
-            reorder.append(data[targets.index(name)])
-        return np.array(reorder,dtype = np.float)
+# reorder data to match plot_targets
+def finalize_data(data,targets,plot_targets,ignore = []):
+    reorder = []
+    for name in plot_targets:
+        if name in ignore or name not in targets: continue
+        reorder.append(data[targets.index(name)])
+    return np.array(reorder,dtype = np.float)
 
-    def _simulate(self,*args,**kwargs):
-        sstr = self.system_string
-        if self.timeout:data = chemfast_to.simulate(sstr,self.timeout)
-        else:data = chemfast.simulate(sstr)
-        return self._finalize_data(*data)
+# this must be a single argument function because of map_async
+def simulate(args):
+    sstr,timeout,ptargs = args
+    if timeout:data,targs = chemfast_to.simulate(sstr,timeout)
+    else:data,targs = chemfast.simulate(sstr)
+    return finalize_data(data,targs,ptargs)
 
 ################################################################################
 ### run_parameter subclasses used to interface with the cython simulator
@@ -403,8 +407,7 @@ class function(run_param):
 
     # modifies sim_string for ext_signal support
     #   THIS NEEDS MORE CLEANUP
-    def _sim_string_ext_signal(self):
-        afunc = self.func_statement
+    def _sim_string_ext_signal(self,afunc):
         extcnt = afunc.count('external_signal')
         fixed = []
         for exts in range(extcnt):
@@ -434,7 +437,7 @@ class function(run_param):
         return afunc
 
     def _sim_string(self):
-        sysstr = self.name + '=' + self.func_statement.replaces(',','&')
+        sysstr = self.name + '=' + self.func_statement.replace(',','&')
         return self._sim_string_ext_signal(sysstr)
 
     def _string(self):
