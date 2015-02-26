@@ -1,15 +1,9 @@
-import modular_core.libfundamental as lfu
-from modular_core.libfundamental import mobject as modular_object
-from modular_core.libfundamental import run_parameter as run_param
+import modular_core.fundamental as lfu
+from modular_core.fundamental import mobject as modular_object
+from modular_core.fundamental import run_parameter as run_param
 
-import modular_core.libsimcomponents as lsc
-import modular_core.libmath as lm
-import modular_core.libgeometry as lgeo
-import modular_core.libmodcomponents as lmc
-
-import modular_core.fitting.libfitroutine as lfr
-import modular_core.postprocessing.libpostprocess as lpp
-import modular_core.criteria.libcriterion as lc
+import modular_core.parameterspaces as lpsp
+import modular_core.simulationmodule as lmc
 
 import stringchemical as chemfast
 import stringchemical_timeout as chemfast_to
@@ -188,15 +182,15 @@ class simulation_module(lmc.simulation_module):
                 selected_variable = 'None',selected_function = 'None', 
                 selected_reaction = 'None',selected_species = 'None')]
 
-    def _run_param_template(self,window,ensem,
-            mobjname,key,handle_key,memory_key):
+    def _run_param_template(self,window,ensem,base,
+                mobjname,key,handle_key,memory_key):
         new = (key,lgm.generate_add_remove_select_inspect_box_template(
             window = window,key = key,parent = ensem,
             labels = ['Add ' + mobjname,'Remove ' + mobjname], 
             wheres = [ensem.children,ensem.run_params[key]],
             selector_handle = (self.module_memory[0],handle_key),
             memory_handle = (self.module_memory[0],memory_key), 
-            base_class = variable))
+            base_class = base))
         return new
 
     def _panel_templates(self,*args,**kwargs):
@@ -210,14 +204,18 @@ class simulation_module(lmc.simulation_module):
         panel_template_lookup =\
             lmc.simulation_module._panel_templates(
                 self,window,ensem,plot_target_labels)
-        panel_template_lookup.append(self._run_param_template(window,ensem,
-            'Variable','variables','variable_selector','selected_variable'))
-        panel_template_lookup.append(self._run_param_template(window,ensem,
-            'Function','functions','function_selector','selected_function'))
-        panel_template_lookup.append(self._run_param_template(window,ensem,
-            'Reaction','reactions','reaction_selector','selected_reaction'))
-        panel_template_lookup.append(self._run_param_template(window,ensem,
-            'Species','species','species_selector','selected_species'))
+        vargs = (window,ensem,variable,
+            'Variable','variables','variable_selector','selected_variable')
+        fargs = (window,ensem,function,
+            'Function','functions','function_selector','selected_function')
+        rargs = (window,ensem,reaction,
+            'Reaction','reactions','reaction_selector','selected_reaction')
+        sargs = (window,ensem,species,
+            'Species','species','species_selector','selected_species')
+        panel_template_lookup.append(self._run_param_template(*vargs))
+        panel_template_lookup.append(self._run_param_template(*fargs))
+        panel_template_lookup.append(self._run_param_template(*rargs))
+        panel_template_lookup.append(self._run_param_template(*sargs))
         return panel_template_lookup
 
 # reorder data to match plot_targets
@@ -249,7 +247,7 @@ class species(run_param):
         self._default('name','aspecies',**kwargs)
         self._default('initial',0,**kwargs)
         pspace_axes =\
-          [lgeo.pspace_axis(instance = self,key = 'initial',
+          [lpsp.pspace_axis(instance = self,key = 'initial',
               bounds = [0,1000000],increment = 1,continuous = False)]
         self.pspace_axes = pspace_axes
         run_param.__init__(self,*args,**kwargs)
@@ -297,7 +295,7 @@ class reaction(run_param):
         self._default('used',[],**kwargs)
         self._default('produced',[],**kwargs)
         pspace_axes =\
-            [lgeo.pspace_axis(instance = self,key = 'rate',
+            [lpsp.pspace_axis(instance = self,key = 'rate',
                 bounds = [0.0000000000001,100000000000.0], 
                 continuous = True)]
         self.pspace_axes = pspace_axes
@@ -360,7 +358,7 @@ class variable(run_param):
         self._default('name','a variable',**kwargs)
         self._default('value',1.0,**kwargs)
         pspace_axes = [
-            lgeo.pspace_axis(instance = self,key = 'value',
+            lpsp.pspace_axis(instance = self,key = 'value',
                         bounds = [0.0,sys.float_info.max])]
         self.pspace_axes = pspace_axes
         run_param.__init__(self,*args,**kwargs)
@@ -457,6 +455,7 @@ class function(run_param):
             lgm.interface_template_gui(
                 widgets = ['text'], 
                 keys = [['name']], 
+                read_only = [True],
                 instances = [[self]], 
                 initials = [[self.name]], 
                 box_labels = ['Function Name']))
